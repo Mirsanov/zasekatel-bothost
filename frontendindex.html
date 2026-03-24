@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <title>Засекатель</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; }
+        .app { background: white; border-radius: 40px; max-width: 500px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .screen { padding: 24px 20px 20px; display: none; }
+        .screen.active { display: block; }
+        
+        .master-card { background: #f9f9f9; border-radius: 30px; padding: 24px; margin: 20px 0; text-align: center; }
+        .master-buttons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 20px 0; }
+        .master-btn { background: #f0f0f0; border: none; padding: 12px 20px; border-radius: 40px; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; flex: 0 1 auto; }
+        .master-btn:active { background: #e0e0e0; }
+        
+        .mode-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #eee; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; min-height: 56px; }
+        .mode-tab { display: inline-flex; align-items: center; gap: 6px; background: #f0f0f0; padding: 8px 14px; border-radius: 40px; cursor: pointer; transition: all 0.1s; flex-shrink: 0; font-size: 14px; }
+        .mode-tab.active { background: #48bb78; color: white; }
+        .mode-tab:active { background: #e0e0e0; }
+        .mode-add { background: #48bb78; color: white; width: 40px; justify-content: center; }
+        
+        .timer-row { text-align: center; margin-bottom: 8px; }
+        .timer-value { font-size: 36px; font-weight: 700; font-family: monospace; letter-spacing: 2px; color: #333; background: #f5f5f5; padding: 12px 20px; border-radius: 40px; display: inline-block; }
+        .timer-hint { text-align: center; font-size: 11px; color: #aaa; margin-bottom: 20px; }
+        
+        .section-title { font-size: 14px; color: #888; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .event-card { background: #2d2d3a; border-radius: 16px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: all 0.1s; }
+        .event-card:active { background: #3d3d4a; }
+        .event-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .event-time { font-size: 16px; font-weight: 600; color: #e0e0e0; white-space: nowrap; }
+        .event-note { font-size: 13px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; text-align: left; }
+        
+        .manual-card { background: #f0f0f0; border-radius: 16px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.1s; display: flex; justify-content: space-between; align-items: center; }
+        .manual-card:active { background: #e0e0e0; }
+        .manual-text { font-size: 15px; font-weight: 500; color: #333; }
+        .manual-arrow { font-size: 16px; color: #666; }
+        
+        .history-card { background: #f0f0f0; border-radius: 16px; padding: 10px 12px; margin-top: 8px; cursor: pointer; transition: all 0.1s; display: flex; justify-content: space-between; align-items: center; }
+        .history-card:active { background: #e0e0e0; }
+        .history-text { font-size: 15px; font-weight: 500; color: #333; }
+        .history-arrow { font-size: 16px; color: #666; }
+        
+        .record-btn { background: #48bb78; color: white; border: none; width: 100%; padding: 18px; font-size: 20px; font-weight: 600; border-radius: 60px; cursor: pointer; margin: 20px 0; transition: transform 0.1s; box-shadow: 0 4px 12px rgba(72,187,120,0.3); }
+        .record-btn:active { transform: scale(0.98); }
+        
+        .icon-bar { display: flex; justify-content: space-around; margin-top: 16px; flex-wrap: wrap; gap: 10px; }
+        .icon-btn { background: #f0f0f0; border: none; width: 52px; height: 52px; border-radius: 40px; font-size: 24px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .icon-btn:active { background: #e0e0e0; transform: scale(0.95); }
+        
+        .swipe-container { overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+        .swipe-inner { display: flex; width: 100%; }
+        .timer-pane { flex: 0 0 100%; scroll-snap-align: start; padding: 0 4px; }
+        
+        .event-menu-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1002; }
+        .event-menu { background: white; border-radius: 30px; padding: 20px; width: 260px; text-align: center; }
+        .event-menu-btn { display: block; width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; background: #f0f0f0; }
+        .event-menu-btn:active { background: #e0e0e0; }
+        .event-menu-delete { background: #ff6b6b; color: white; }
+        .event-menu-cancel { background: #ddd; }
+        
+        .mode-menu-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1003; }
+        .mode-menu { background: white; border-radius: 30px; padding: 20px; width: 260px; text-align: center; }
+        .mode-menu-btn { display: block; width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; background: #f0f0f0; }
+        .mode-menu-btn:active { background: #e0e0e0; }
+        
+        .screen-header { display: flex; align-items: center; margin-bottom: 24px; gap: 12px; }
+        .back-btn { background: none; border: none; font-size: 28px; cursor: pointer; padding: 8px; border-radius: 40px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+        .back-btn:active { background: #f0f0f0; }
+        .screen-title { font-size: 24px; font-weight: 600; flex: 1; }
+        .settings-list { list-style: none; }
+        .settings-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid #eee; cursor: pointer; }
+        .settings-item:active { background: #f9f9f9; }
+        .settings-label { font-size: 17px; }
+        .settings-value { color: #666; font-size: 15px; }
+        .options-grid { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+        .option-btn { background: #f0f0f0; border: none; padding: 10px 12px; border-radius: 40px; font-size: 14px; cursor: pointer; flex: 1; min-width: 70px; text-align: center; }
+        .selected-interval { background: #48bb78 !important; color: white !important; }
+        .stats-text { font-family: monospace; font-size: 14px; background: #2d2d3a; color: #e0e0e0; padding: 16px; border-radius: 20px; margin: 16px 0; white-space: pre-wrap; line-height: 1.5; overflow-x: auto; word-break: break-word; cursor: pointer; }
+        .stats-text .history-link { color: #88aaff; text-decoration: underline; }
+        .status { margin-top: 16px; padding: 12px; border-radius: 20px; font-size: 14px; text-align: center; }
+        .status.success { background: #c6f6d5; color: #22543d; }
+        .status.error { background: #fed7d7; color: #742a2a; }
+        .alice-code { font-size: 48px; font-weight: bold; text-align: center; font-family: monospace; background: #f0f0f0; padding: 20px; border-radius: 20px; margin: 20px 0; letter-spacing: 8px; }
+        .hidden { display: none; }
+        textarea { width: 100%; padding: 15px; font-size: 16px; border-radius: 20px; border: 1px solid #ddd; margin: 20px 0; font-family: inherit; resize: vertical; }
+        .choice-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .choice-menu { background: white; border-radius: 30px; padding: 24px; width: 280px; text-align: center; }
+        .choice-btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 30px; font-size: 18px; cursor: pointer; background: #f0f0f0; }
+        .choice-btn:active { background: #e0e0e0; }
+        .choice-cancel { background: #ff6b6b; color: white; }
+        .confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1001; }
+        .confirm-menu { background: white; border-radius: 30px; padding: 24px; width: 280px; text-align: center; }
+        .confirm-buttons { display: flex; gap: 12px; margin-top: 20px; }
+        .confirm-yes { background: #ff6b6b; color: white; border: none; padding: 12px; border-radius: 30px; flex: 1; cursor: pointer; }
+        .confirm-no { background: #f0f0f0; border: none; padding: 12px; border-radius: 30px; flex: 1; cursor: pointer; }
+        .mode-option { background: #f0f0f0; border: none; padding: 15px; margin: 8px 0; border-radius: 30px; font-size: 18px; width: 100%; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+        .mode-option:active { background: #e0e0e0; }
+        .mode-option .icon { font-size: 24px; }
+        .custom-interval-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1002; }
+        .custom-interval-menu { background: white; border-radius: 30px; padding: 24px; width: 320px; text-align: center; }
+        .custom-interval-menu input { width: 100%; padding: 12px; font-size: 18px; border: 1px solid #ddd; border-radius: 30px; margin: 15px 0; text-align: center; }
+        .custom-interval-buttons { display: flex; gap: 12px; }
+        .custom-interval-buttons button { flex: 1; padding: 12px; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; }
+        .custom-ok { background: #48bb78; color: white; }
+        .custom-cancel { background: #ff6b6b; color: white; }
+        .custom-hint { font-size: 12px; color: #888; margin-top: 5px; }
+        .quiet-info { font-size: 12px; color: #666; text-align: center; margin-top: 10px; }
+        .delete-history-btn { margin-top: 16px; background: #ffebee; color: #c62828; border: none; padding: 12px; border-radius: 40px; width: 100%; font-size: 14px; cursor: pointer; }
+        .delete-history-btn:active { background: #ffcdd2; }
+    </style>
+</head>
+<body>
+<div class="app" id="app">
+    <div id="master-screen" class="screen">
+        <div style="text-align: center; margin-bottom: 10px;"><span style="font-size: 32px;">⏱️</span><span style="font-size: 20px; font-weight: 500;"> Засекатель</span></div>
+        <div class="master-card">
+            <p style="margin-bottom: 16px;">👋 Привет! Я помогаю отслеживать интервалы между событиями.</p>
+            <p style="margin-bottom: 16px;">Записывай время, смотри статистику, добавляй заметки.</p>
+            <p>Выбери, что будем засекать:</p>
+        </div>
+        <div class="master-buttons">
+            <button class="master-btn" data-mode="кормление" data-icon="🍼">🍼 Кормление</button>
+            <button class="master-btn" data-mode="лекарства" data-icon="💊">💊 Лекарства</button>
+            <button class="master-btn" data-mode="вода" data-icon="💧">💧 Вода</button>
+            <button class="master-btn" data-mode="спорт" data-icon="🏃">🏃 Спорт</button>
+            <button class="master-btn" data-mode="схватки" data-icon="🤰">🤰 Схватки</button>
+            <button class="master-btn" data-mode="сигарета" data-icon="🚬">🚬 Сигарета</button>
+        </div>
+        <button id="master-custom" class="master-btn" style="background: #ddd;">✏️ Свой вариант</button>
+    </div>
+    
+    <div id="main-screen" class="screen">
+        <div class="mode-header" id="mode-header"></div>
+        <div class="swipe-container" id="swipe-container">
+            <div class="swipe-inner" id="swipe-inner"></div>
+        </div>
+        <div id="timer-status" class="status hidden"></div>
+    </div>
+    
+    <div id="quiet-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="main">←</button><div class="screen-title" id="quiet-title">🔕 Не беспокоить</div></div>
+        <div class="options-grid" id="quiet-options"></div>
+        <div id="quiet-status" class="status hidden"></div>
+    </div>
+    <div id="manual-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="main">←</button><div class="screen-title">✏️ Ввести время вручную</div></div>
+        <input type="text" id="manual-time" placeholder="Например: 14:30, 14.30, 1430" style="width:100%; padding:15px; font-size:18px; border-radius:30px; border:1px solid #ddd; margin:20px 0;">
+        <div id="manual-hint" style="font-size:12px; color:#888; margin-top:-15px; margin-bottom:10px;"></div>
+        <button id="manual-submit" style="width:100%; padding:15px; background:#667eea; color:white; border:none; border-radius:30px;">Записать</button>
+        <div id="manual-status" class="status hidden"></div>
+    </div>
+    <div id="note-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="main">←</button><div class="screen-title">📝 Заметка</div></div>
+        <textarea id="note-text" rows="4" placeholder="Что произошло? (макс 200 символов)" maxlength="200" style="width:100%; padding:15px; font-size:16px; border-radius:20px; border:1px solid #ddd; margin:20px 0; font-family: inherit; resize: vertical;"></textarea>
+        <button id="note-submit" style="width:100%; padding:15px; background:#667eea; color:white; border:none; border-radius:30px;">Добавить заметку</button>
+        <div id="note-status" class="status hidden"></div>
+    </div>
+    <div id="stats-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="main">←</button><div class="screen-title">📊 Статистика</div></div>
+        <div id="stats-content" class="stats-text">Загрузка...</div>
+    </div>
+    <div id="settings-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="main">←</button><div class="screen-title">⚙️ Настройки</div></div>
+        <div class="settings-list">
+            <div class="settings-item" data-setting="mode"><span class="settings-label">⚙️ Режим</span><span class="settings-value" id="mode-value">свободный ⏱️</span></div>
+            <div class="settings-item" data-setting="interval"><span class="settings-label">⏰ Интервал</span><span class="settings-value" id="interval-value">Свободный</span></div>
+            <div class="settings-item" data-setting="alice"><span class="settings-label">🎤 Алиса</span><span class="settings-value">Подключить</span></div>
+            <div class="settings-item" data-setting="premium"><span class="settings-label">💎 Премиум</span><span class="settings-value">Бесплатно</span></div>
+            <div class="settings-item" data-setting="reset"><span class="settings-label">🗑️ Сбросить</span><span class="settings-value">Удалить всё</span></div>
+            <div class="settings-item" data-setting="feedback"><span class="settings-label">📧 Обратная связь</span><span class="settings-value">Написать</span></div>
+        </div>
+    </div>
+    <div id="interval-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="settings">←</button><div class="screen-title">⏰ Интервал</div></div>
+        <div class="options-grid" id="interval-options"></div>
+        <div id="interval-status" class="status hidden"></div>
+    </div>
+    <div id="alice-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="settings">←</button><div class="screen-title">🎤 Алиса</div></div>
+        <div style="margin: 20px 0;"><p>1️⃣ Скажите Алисе: <strong>"запусти навык Засекатель"</strong></p><p>2️⃣ Скажите Алисе: <strong>"мой код XXXX"</strong></p><div class="alice-code" id="alice-code">----</div><p style="font-size: 14px; color: #666;">Код действителен 10 минут</p></div>
+        <button id="alice-refresh" style="width:100%; padding:15px; background:#667eea; color:white; border:none; border-radius:30px;">🔄 Новый код</button>
+        <div id="alice-status" class="status hidden"></div>
+    </div>
+    <div id="premium-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="settings">←</button><div class="screen-title">💎 Премиум</div></div>
+        <div style="background: #f5f5f5; border-radius: 30px; padding: 20px; margin: 20px 0;">
+            <p><strong>Сейчас: БЕСПЛАТНАЯ ВЕРСИЯ</strong></p>
+            <p>• 1 активный таймер<br>• базовая статистика<br>• без уведомлений</p>
+            <hr style="margin: 15px 0;">
+            <p><strong>ПРЕМИУМ (199 ₽/мес):</strong></p>
+            <p>✅ До 5 активных таймеров<br>✅ Расширенная статистика с графиками<br>✅ Экспорт данных в CSV<br>✅ История за любой период<br>✅ Уведомления для всех таймеров</p>
+            <p style="color: #48bb78;"><strong>Пробный период: 14 дней бесплатно!</strong></p>
+        </div>
+        <button id="premium-trial" style="width:100%; padding:15px; background:#48bb78; color:white; border:none; border-radius:30px;">💳 Попробовать бесплатно</button>
+        <div id="premium-status" class="status hidden"></div>
+    </div>
+    <div id="help-screen" class="screen">
+        <div class="screen-header"><button class="back-btn" data-back="main">←</button><div class="screen-title">❓ Помощь</div></div>
+        <div style="margin: 20px 0;"><p>Вы нажали "Записать" — я запомнил время.</p><p>Теперь вы можете:</p><ul style="margin-left: 20px; margin-top: 10px;"><li>Спросить "Сколько прошло?" — я скажу</li><li>Нажать "Записать" снова — я запишу новое время</li><li>Ввести время вручную, если забыли</li><li>Добавить заметку к последней записи</li><li>Удалить последнюю запись (кнопка 🗑️)</li><li>Включить/выключить уведомления</li><li>Временно отключить уведомления (🔕)</li></ul></div>
+        <button id="help-more" style="width:100%; padding:15px; background:#667eea; color:white; border:none; border-radius:30px;">📖 Подробнее о возможностях</button>
+    </div>
+</div>
+
+<script>
+    const API_BASE = 'https://mirsanov.duckdns.org/api';
+    let currentUserId = null;
+    let timers = [];
+    let activeTimerIndex = 0;
+    let timerInterval = null;
+
+    const popularModes = [
+        { name: "кормление", icon: "🍼" },
+        { name: "лекарства", icon: "💊" },
+        { name: "вода", icon: "💧" },
+        { name: "спорт", icon: "🏃" },
+        { name: "схватки", icon: "🤰" },
+        { name: "сигарета", icon: "🚬" }
+    ];
+
+    function getUserId() {
+        let userId = localStorage.getItem('zasekatel_user_id');
+        if (!userId) {
+            userId = 'user_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('zasekatel_user_id', userId);
+        }
+        return userId;
+    }
+
+    function formatDiffSmart(seconds, mode) {
+        if (seconds < 0) return '';
+        if (mode === 'спорт') {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            if (hours > 0) return `+${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            if (minutes > 0) return `+${minutes.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            return `+${secs}с`;
+        }
+        if (seconds < 60) return `+${Math.floor(seconds)}с`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `+${minutes}м`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (mins === 0) return `+${hours.toString().padStart(2,'0')}:00`;
+        return `+${hours.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
+    }
+
+    function formatTimeDiff(ms) {
+        if (ms < 0 || isNaN(ms)) return '--:--:--';
+        const seconds = Math.floor(ms / 1000);
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        if (days > 0) return `${days}:${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+        else if (hours > 0) return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+        else return `${minutes.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+    }
+
+    function formatTime(date) {
+        if (!date || isNaN(date.getTime())) return '--:--';
+        return `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+    }
+
+    function formatDate(date) {
+        if (!date || isNaN(date.getTime())) return '--.--.----';
+        return `${date.getDate().toString().padStart(2,'0')}.${(date.getMonth()+1).toString().padStart(2,'0')}.${date.getFullYear()}`;
+    }
+
+    function formatMinutesToTime(minutes) {
+        if (minutes <= 0) return '';
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours > 0 && mins > 0) return `${hours}ч ${mins}м`;
+        if (hours > 0) return `${hours}ч`;
+        return `${mins}м`;
+    }
+
+    function saveTimersToLocal() {
+        localStorage.setItem('zasekatel_timers', JSON.stringify(timers.map(t => ({
+            id: t.id,
+            name: t.name,
+            icon: t.icon,
+            interval: t.interval,
+            notifications: t.notifications,
+            quietUntil: t.quietUntil,
+            events: t.events.map(e => ({ timestamp: e.timestamp.toISOString(), note: e.note }))
+        }))));
+    }
+
+    function loadTimersFromLocal() {
+        const saved = localStorage.getItem('zasekatel_timers');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            timers = parsed.map(t => ({
+                id: t.id,
+                name: t.name,
+                icon: t.icon,
+                interval: t.interval || 0,
+                notifications: t.notifications || false,
+                quietUntil: t.quietUntil ? new Date(t.quietUntil) : null,
+                events: t.events.map(e => ({ timestamp: new Date(e.timestamp), note: e.note })).sort((a,b)=>b.timestamp - a.timestamp),
+                lastTimestamp: t.events.length ? new Date(t.events[0].timestamp) : null
+            }));
+            if (timers.length === 0) showMasterScreen();
+            else {
+                activeTimerIndex = 0;
+                renderMainScreen();
+                startTimer();
+                document.getElementById('master-screen').classList.remove('active');
+                document.getElementById('main-screen').classList.add('active');
+            }
+        } else {
+            showMasterScreen();
+        }
+    }
+
+    function showMasterScreen() {
+        document.getElementById('master-screen').classList.add('active');
+        document.getElementById('main-screen').classList.remove('active');
+    }
+
+    function showCustomNameDialog() {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-interval-overlay';
+        overlay.innerHTML = `
+            <div class="custom-interval-menu">
+                <div style="font-size: 18px; margin-bottom: 10px;">Название режима</div>
+                <input type="text" id="custom-name-input" placeholder="Введите название" value="" style="width:100%; padding:12px; border-radius:20px; border:1px solid #ddd;">
+                <div class="custom-interval-buttons" style="margin-top:15px;">
+                    <button class="custom-ok">Создать</button>
+                    <button class="custom-cancel">Отмена</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('#custom-name-input');
+        input.focus();
+        overlay.querySelector('.custom-ok').addEventListener('click', () => {
+            const name = input.value.trim();
+            overlay.remove();
+            if (name) createTimer(name, '⏱️');
+        });
+        overlay.querySelector('.custom-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function createTimer(name, icon) {
+        const newTimer = {
+            id: Date.now(),
+            name: name,
+            icon: icon,
+            interval: 0,
+            notifications: false,
+            quietUntil: null,
+            events: [],
+            lastTimestamp: null
+        };
+        timers.push(newTimer);
+        saveTimersToLocal();
+        if (timers.length === 1) {
+            activeTimerIndex = 0;
+            renderMainScreen();
+            startTimer();
+            document.getElementById('master-screen').classList.remove('active');
+            document.getElementById('main-screen').classList.add('active');
+        } else {
+            renderMainScreen();
+        }
+        syncToServer();
+    }
+
+    function renameTimer(index, newName) {
+        timers[index].name = newName;
+        saveTimersToLocal();
+        renderMainScreen();
+        syncToServer();
+        showStatus('timer-status', `Режим переименован в "${newName}"`);
+    }
+
+    function showRenameDialog(index) {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-interval-overlay';
+        overlay.innerHTML = `
+            <div class="custom-interval-menu">
+                <div style="font-size: 18px; margin-bottom: 10px;">Новое название</div>
+                <input type="text" id="rename-input" value="${timers[index].name}" style="width:100%; padding:12px; border-radius:20px; border:1px solid #ddd;">
+                <div class="custom-interval-buttons" style="margin-top:15px;">
+                    <button class="custom-ok">Сохранить</button>
+                    <button class="custom-cancel">Отмена</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('#rename-input');
+        input.focus();
+        input.select();
+        overlay.querySelector('.custom-ok').addEventListener('click', () => {
+            const newName = input.value.trim();
+            overlay.remove();
+            if (newName && newName !== timers[index].name) {
+                renameTimer(index, newName);
+            }
+        });
+        overlay.querySelector('.custom-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function showModeMenu(index) {
+        const overlay = document.createElement('div');
+        overlay.className = 'mode-menu-overlay';
+        overlay.innerHTML = `
+            <div class="mode-menu">
+                <div style="font-size: 16px; margin-bottom: 12px;">${timers[index].icon} ${timers[index].name}</div>
+                <button class="mode-menu-btn" id="mode-rename">✏️ Переименовать</button>
+                <button class="mode-menu-btn" id="mode-delete">🗑️ Удалить</button>
+                <button class="mode-menu-btn" id="mode-cancel">Отмена</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#mode-rename').addEventListener('click', () => {
+            overlay.remove();
+            showRenameDialog(index);
+        });
+        overlay.querySelector('#mode-delete').addEventListener('click', () => {
+            overlay.remove();
+            showDeleteConfirm(index);
+        });
+        overlay.querySelector('#mode-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function showDeleteConfirm(index) {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-menu">
+                <p>Удалить режим "${timers[index].name}"?</p>
+                <div class="confirm-buttons">
+                    <button class="confirm-yes">Да</button>
+                    <button class="confirm-no">Нет</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.confirm-yes').addEventListener('click', () => {
+            overlay.remove();
+            if (timers.length <= 1) {
+                showStatus('timer-status', 'Нельзя удалить последний таймер. Создайте новый.', true);
+                return;
+            }
+            timers.splice(index, 1);
+            if (activeTimerIndex >= timers.length) activeTimerIndex = timers.length - 1;
+            saveTimersToLocal();
+            renderMainScreen();
+            startTimer();
+            syncToServer();
+            showStatus('timer-status', 'Режим удалён');
+        });
+        overlay.querySelector('.confirm-no').addEventListener('click', () => overlay.remove());
+    }
+
+    function updateTimerDisplay() {
+        const timer = timers[activeTimerIndex];
+        if (timer && timer.lastTimestamp) {
+            const now = new Date();
+            const diffMs = now - timer.lastTimestamp;
+            const timerEl = document.querySelector(`.timer-value[data-idx="${activeTimerIndex}"]`);
+            if (timerEl) timerEl.textContent = formatTimeDiff(diffMs);
+        } else {
+            const timerEl = document.querySelector(`.timer-value[data-idx="${activeTimerIndex}"]`);
+            if (timerEl) timerEl.textContent = '--:--:--';
+        }
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        updateTimerDisplay();
+        timerInterval = setInterval(updateTimerDisplay, 1000);
+    }
+
+    function setActiveTimer(index, fromSwipe = false) {
+        if (index === activeTimerIndex && !fromSwipe) return;
+        activeTimerIndex = index;
+        const tabs = document.querySelectorAll('.mode-tab');
+        tabs.forEach((tab, idx) => {
+            if (idx === activeTimerIndex) tab.classList.add('active');
+            else tab.classList.remove('active');
+        });
+        updateTimerDisplay();
+        const container = document.getElementById('swipe-container');
+        if (container && !fromSwipe) {
+            container.scrollLeft = activeTimerIndex * container.clientWidth;
+        }
+    }
+
+    function renderMainScreen() {
+        const header = document.getElementById('mode-header');
+        const swipeInner = document.getElementById('swipe-inner');
+        header.innerHTML = '';
+        swipeInner.innerHTML = '';
+
+        timers.forEach((timer, idx) => {
+            const tab = document.createElement('div');
+            tab.className = 'mode-tab' + (idx === activeTimerIndex ? ' active' : '');
+            tab.innerHTML = `${timer.icon} ${timer.name}`;
+            tab.onclick = () => setActiveTimer(idx, false);
+            tab.ondblclick = (e) => {
+                e.stopPropagation();
+                if (idx === activeTimerIndex) {
+                    showModeMenu(idx);
+                }
+            };
+            header.appendChild(tab);
+        });
+        const addTab = document.createElement('div');
+        addTab.className = 'mode-tab mode-add';
+        addTab.innerHTML = '+';
+        addTab.onclick = () => showCreateModeDialog();
+        header.appendChild(addTab);
+
+        for (let idx = 0; idx < timers.length; idx++) {
+            const timer = timers[idx];
+            const pane = document.createElement('div');
+            pane.className = 'timer-pane';
+            pane.setAttribute('data-idx', idx);
+            pane.innerHTML = `
+                <div class="timer-row">
+                    <div class="timer-value" data-idx="${idx}">--:--:--</div>
+                </div>
+                <div class="timer-hint">от последнего события</div>
+                <div class="section-title">ПОСЛЕДНИЕ СОБЫТИЯ</div>
+                <div id="events-list-${idx}"></div>
+                <button class="record-btn" data-idx="${idx}">${timer.icon} ЗАПИСАТЬ</button>
+                <div class="icon-bar">
+                    <button class="icon-btn quiet-btn" data-idx="${idx}">${timer.notifications ? '🔔' : '🔕'}</button>
+                    <button class="icon-btn stats-btn" data-idx="${idx}">📊</button>
+                    <button class="icon-btn settings-btn" data-idx="${idx}">⚙️</button>
+                    <button class="icon-btn help-btn">?</button>
+                </div>
+            `;
+            swipeInner.appendChild(pane);
+        }
+
+        for (let idx = 0; idx < timers.length; idx++) {
+            const recordBtn = document.querySelector(`.record-btn[data-idx="${idx}"]`);
+            if (recordBtn) recordBtn.onclick = () => recordEvent(idx);
+            const quietBtn = document.querySelector(`.quiet-btn[data-idx="${idx}"]`);
+            if (quietBtn) quietBtn.onclick = () => showQuietScreen(idx);
+            const statsBtn = document.querySelector(`.stats-btn[data-idx="${idx}"]`);
+            if (statsBtn) statsBtn.onclick = () => { showScreen('stats'); loadStats(idx); };
+            const settingsBtn = document.querySelector(`.settings-btn[data-idx="${idx}"]`);
+            if (settingsBtn) settingsBtn.onclick = () => { activeTimerIndex = idx; showScreen('settings'); loadSettingsForTimer(idx); };
+        }
+
+        timers.forEach((timer, idx) => {
+            renderEventsList(idx);
+        });
+        updateTimerDisplay();
+        
+        const container = document.getElementById('swipe-container');
+        if (container) {
+            container.removeEventListener('scroll', onScroll);
+            container.addEventListener('scroll', onScroll);
+            container.scrollLeft = activeTimerIndex * container.clientWidth;
+        }
+    }
+
+    function onScroll() {
+        const container = document.getElementById('swipe-container');
+        if (!container) return;
+        const paneWidth = container.clientWidth;
+        const newIndex = Math.round(container.scrollLeft / paneWidth);
+        if (newIndex !== activeTimerIndex && newIndex >= 0 && newIndex < timers.length) {
+            setActiveTimer(newIndex, true);
+        }
+    }
+
+    function renderEventsList(timerIdx) {
+        const timer = timers[timerIdx];
+        const container = document.getElementById(`events-list-${timerIdx}`);
+        if (!container) return;
+        container.innerHTML = '';
+
+        const manualCard = document.createElement('div');
+        manualCard.className = 'manual-card';
+        manualCard.innerHTML = `<span class="manual-text">✏️ Ввести время вручную</span><span class="manual-arrow">→</span>`;
+        manualCard.onclick = () => { activeTimerIndex = timerIdx; showScreen('manual'); updateManualHint(timer); };
+        container.appendChild(manualCard);
+
+        const events = timer.events.slice(0, 5);
+        for (let i = 0; i < events.length; i++) {
+            const e = events[i];
+            if (!e.timestamp || isNaN(e.timestamp.getTime())) continue;
+            const prevEvent = i < timer.events.length - 1 ? timer.events[i + 1] : null;
+            let diff = '';
+            if (prevEvent && prevEvent.timestamp && !isNaN(prevEvent.timestamp.getTime())) {
+                const diffSec = (e.timestamp - prevEvent.timestamp) / 1000;
+                diff = formatDiffSmart(diffSec, timer.name);
+                if (diff) diff = ' ' + diff;
+            }
+            const card = document.createElement('div');
+            card.className = 'event-card';
+            card.innerHTML = `
+                <div class="event-row">
+                    <span class="event-time">${formatTime(e.timestamp)}${diff}</span>
+                    ${e.note ? `<span class="event-note">📝 ${e.note}</span>` : ''}
+                </div>
+            `;
+            card.onclick = () => showEventMenu(timerIdx, i, e.note);
+            container.appendChild(card);
+        }
+
+        const historyCard = document.createElement('div');
+        historyCard.className = 'history-card';
+        historyCard.innerHTML = `<span class="history-text">📋 ВСЯ ИСТОРИЯ</span><span class="history-arrow">→</span>`;
+        historyCard.onclick = () => { showScreen('stats'); loadStats(timerIdx); };
+        container.appendChild(historyCard);
+    }
+
+    async function recordEvent(timerIdx) {
+        const timer = timers[timerIdx];
+        const now = new Date();
+        const newEvent = {
+            timestamp: now,
+            note: null
+        };
+        timer.events.unshift(newEvent);
+        timer.lastTimestamp = now;
+        saveTimersToLocal();
+        renderEventsList(timerIdx);
+        updateTimerDisplay();
+        await syncToServer();
+        let msg = `✅ Записано в ${formatTime(now)}`;
+        if (timer.events.length > 1) {
+            const diffSec = (timer.events[0].timestamp - timer.events[1].timestamp) / 1000;
+            const diff = formatDiffSmart(diffSec, timer.name);
+            if (diff) msg += ` ${diff}`;
+        }
+        showStatus(`timer-status`, msg);
+    }
+
+    async function addManualEvent(timerIdx, timeStr) {
+        const timer = timers[timerIdx];
+        let eventDate = new Date();
+        try {
+            let hours, minutes;
+            if (timeStr.includes(':')) {
+                [hours, minutes] = timeStr.split(':');
+            } else if (timeStr.includes('.')) {
+                [hours, minutes] = timeStr.split('.');
+            } else if (timeStr.length === 4) {
+                hours = timeStr.substring(0, 2);
+                minutes = timeStr.substring(2, 4);
+            } else {
+                throw new Error('Неверный формат');
+            }
+            hours = parseInt(hours);
+            minutes = parseInt(minutes);
+            if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+                throw new Error('Неверное время');
+            }
+            eventDate.setHours(hours, minutes, 0, 0);
+            const now = new Date();
+            if (eventDate > now) {
+                eventDate.setDate(eventDate.getDate() - 1);
+            }
+        } catch (e) {
+            showStatus('manual-status', 'Неверный формат времени', true);
+            return false;
+        }
+        const newEvent = {
+            timestamp: eventDate,
+            note: null
+        };
+        timer.events.unshift(newEvent);
+        timer.events.sort((a,b)=>b.timestamp - a.timestamp);
+        timer.lastTimestamp = timer.events[0].timestamp;
+        saveTimersToLocal();
+        renderEventsList(timerIdx);
+        updateTimerDisplay();
+        await syncToServer();
+        let msg = `✅ Записано в ${formatTime(eventDate)}`;
+        if (timer.events.length > 1) {
+            const diffSec = (timer.events[0].timestamp - timer.events[1].timestamp) / 1000;
+            const diff = formatDiffSmart(diffSec, timer.name);
+            if (diff) msg += ` ${diff}`;
+        }
+        showStatus('manual-status', msg);
+        return true;
+    }
+
+    function showEventMenu(timerIdx, eventIndex, currentNote) {
+        const overlay = document.createElement('div');
+        overlay.className = 'event-menu-overlay';
+        overlay.innerHTML = `
+            <div class="event-menu">
+                <button class="event-menu-btn event-menu-edit">📝 Редактировать заметку</button>
+                <button class="event-menu-btn event-menu-delete">🗑️ Удалить</button>
+                <button class="event-menu-btn event-menu-cancel">Отмена</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.event-menu-edit').addEventListener('click', () => {
+            overlay.remove();
+            showEditNoteDialog(timerIdx, eventIndex, currentNote);
+        });
+        overlay.querySelector('.event-menu-delete').addEventListener('click', () => {
+            overlay.remove();
+            deleteEvent(timerIdx, eventIndex);
+        });
+        overlay.querySelector('.event-menu-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function showEditNoteDialog(timerIdx, eventIndex, currentNote) {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-interval-overlay';
+        overlay.innerHTML = `
+            <div class="custom-interval-menu">
+                <div style="font-size: 18px; margin-bottom: 10px;">Редактировать заметку</div>
+                <textarea id="edit-note-text" rows="3" maxlength="200" style="width:100%; padding:12px; border-radius:20px; border:1px solid #ddd; font-family:inherit;">${currentNote || ''}</textarea>
+                <div class="custom-interval-buttons" style="margin-top:15px;">
+                    <button class="custom-ok">Сохранить</button>
+                    <button class="custom-cancel">Отмена</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const textarea = overlay.querySelector('#edit-note-text');
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        overlay.querySelector('.custom-ok').addEventListener('click', async () => {
+            const newNote = textarea.value.trim();
+            overlay.remove();
+            timers[timerIdx].events[eventIndex].note = newNote;
+            saveTimersToLocal();
+            renderEventsList(timerIdx);
+            await syncToServer();
+            showStatus(`timer-status`, 'Заметка обновлена');
+        });
+        overlay.querySelector('.custom-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function deleteEvent(timerIdx, eventIndex) {
+        timers[timerIdx].events.splice(eventIndex, 1);
+        if (timers[timerIdx].events.length > 0) {
+            timers[timerIdx].lastTimestamp = timers[timerIdx].events[0].timestamp;
+        } else {
+            timers[timerIdx].lastTimestamp = null;
+        }
+        saveTimersToLocal();
+        renderEventsList(timerIdx);
+        updateTimerDisplay();
+        syncToServer();
+        showStatus(`timer-status`, 'Запись удалена');
+    }
+
+    async function syncToServer() {
+        if (!navigator.onLine) return;
+        try {
+            await callAPI('/sync', 'POST', { timers: timers.map(t => ({
+                name: t.name, icon: t.icon, interval: t.interval, notifications: t.notifications, quietUntil: t.quietUntil,
+                events: t.events.map(e => ({ timestamp: e.timestamp.toISOString(), note: e.note }))
+            })) });
+        } catch (e) {}
+    }
+
+    async function syncFromServer() {
+        if (!navigator.onLine) return;
+        try {
+            const result = await callAPI('/sync', 'GET');
+            if (result.timers && result.timers.length > 0) {
+                timers = result.timers.map(t => ({
+                    id: Date.now() + Math.random(),
+                    name: t.name,
+                    icon: t.icon,
+                    interval: t.interval || 0,
+                    notifications: t.notifications || false,
+                    quietUntil: t.quietUntil ? new Date(t.quietUntil) : null,
+                    events: t.events.map(e => ({ timestamp: new Date(e.timestamp), note: e.note })).sort((a,b)=>b.timestamp - a.timestamp),
+                    lastTimestamp: t.events.length ? new Date(t.events[0].timestamp) : null
+                }));
+                saveTimersToLocal();
+                if (timers.length === 0) showMasterScreen();
+                else {
+                    activeTimerIndex = 0;
+                    renderMainScreen();
+                    startTimer();
+                    document.getElementById('master-screen').classList.remove('active');
+                    document.getElementById('main-screen').classList.add('active');
+                }
+            }
+        } catch (e) {}
+    }
+
+    function showCreateModeDialog() {
+        const overlay = document.createElement('div');
+        overlay.className = 'choice-overlay';
+        overlay.innerHTML = `
+            <div class="choice-menu">
+                <button class="choice-btn" id="choice-popular">📋 Популярные</button>
+                <button class="choice-btn" id="choice-custom">✏️ Свой вариант</button>
+                <button class="choice-btn choice-cancel" id="choice-cancel">Отмена</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#choice-popular').addEventListener('click', () => {
+            overlay.remove();
+            showPopularModesDialog();
+        });
+        overlay.querySelector('#choice-custom').addEventListener('click', () => {
+            overlay.remove();
+            showCustomNameDialog();
+        });
+        overlay.querySelector('#choice-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function showPopularModesDialog() {
+        const overlay = document.createElement('div');
+        overlay.className = 'choice-overlay';
+        overlay.innerHTML = `<div class="choice-menu" style="width: 300px;"><div id="mode-popup-list"></div><button class="choice-btn choice-cancel" id="popup-cancel">Отмена</button></div>`;
+        document.body.appendChild(overlay);
+        const list = overlay.querySelector('#mode-popup-list');
+        popularModes.forEach(mode => {
+            const btn = document.createElement('button');
+            btn.className = 'choice-btn';
+            btn.innerHTML = `${mode.icon} ${mode.name}`;
+            btn.onclick = () => {
+                overlay.remove();
+                createTimer(mode.name, mode.icon);
+            };
+            list.appendChild(btn);
+        });
+        overlay.querySelector('#popup-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function showCustomQuietPrompt(timerIdx) {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-interval-overlay';
+        overlay.innerHTML = `
+            <div class="custom-interval-menu">
+                <div style="font-size: 18px; margin-bottom: 10px;">Введите часы</div>
+                <input type="number" id="custom-quiet-input" placeholder="часы" value="2" step="1" min="1" style="width:100%; padding:12px; border-radius:20px; border:1px solid #ddd;">
+                <div class="custom-hint">На сколько часов отключить уведомления?</div>
+                <div class="custom-interval-buttons" style="margin-top:15px;">
+                    <button class="custom-ok">OK</button>
+                    <button class="custom-cancel">Отмена</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('#custom-quiet-input');
+        input.focus();
+        overlay.querySelector('.custom-ok').addEventListener('click', () => {
+            let hours = parseInt(input.value);
+            if (isNaN(hours) || hours < 1) hours = 1;
+            const minutes = hours * 60;
+            overlay.remove();
+            setQuiet(timerIdx, minutes, hours);
+        });
+        overlay.querySelector('.custom-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function showQuietScreen(timerIdx) {
+        const quietOptions = document.getElementById('quiet-options');
+        quietOptions.innerHTML = '';
+        const titleEl = document.getElementById('quiet-title');
+        
+        const notificationsBtn = document.createElement('button');
+        notificationsBtn.className = 'option-btn';
+        notificationsBtn.textContent = timers[timerIdx].notifications ? '🔕 Выключить уведомления' : '🔔 Включить уведомления';
+        notificationsBtn.style.background = '#667eea';
+        notificationsBtn.style.color = 'white';
+        notificationsBtn.addEventListener('click', async () => {
+            await toggleNotifications(timerIdx);
+            showQuietScreen(timerIdx);
+        });
+        quietOptions.appendChild(notificationsBtn);
+        
+        const separator = document.createElement('div');
+        separator.style.width = '100%';
+        separator.style.height = '1px';
+        separator.style.backgroundColor = '#ddd';
+        separator.style.margin = '10px 0';
+        quietOptions.appendChild(separator);
+        
+        if (timers[timerIdx].quietUntil && new Date(timers[timerIdx].quietUntil) > new Date()) {
+            const remainingMs = timers[timerIdx].quietUntil - new Date();
+            const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
+            const remainingMins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+            titleEl.innerHTML = '🔔 Отключить "Не беспокоить"';
+            const info = document.createElement('div');
+            info.className = 'quiet-info';
+            info.textContent = `Активен до ${timers[timerIdx].quietUntil.toLocaleTimeString()} (осталось ${remainingHours}ч ${remainingMins}м)`;
+            quietOptions.appendChild(info);
+            const offBtn = document.createElement('button');
+            offBtn.className = 'option-btn';
+            offBtn.textContent = '🔔 Выключить режим "Не беспокоить"';
+            offBtn.style.background = '#48bb78';
+            offBtn.style.color = 'white';
+            offBtn.addEventListener('click', () => setQuiet(timerIdx, null));
+            quietOptions.appendChild(offBtn);
+        } else {
+            titleEl.innerHTML = '🔕 Не беспокоить';
+            [60, 120, 240, 480].forEach(mins => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                let text = mins === 60 ? '1 час' : mins === 120 ? '2 часа' : mins === 240 ? '4 часа' : '8 часов';
+                btn.textContent = text;
+                btn.addEventListener('click', () => setQuiet(timerIdx, mins, mins/60));
+                quietOptions.appendChild(btn);
+            });
+            const customBtn = document.createElement('button');
+            customBtn.className = 'option-btn';
+            customBtn.textContent = '✏️ Свой';
+            customBtn.addEventListener('click', () => showCustomQuietPrompt(timerIdx));
+            quietOptions.appendChild(customBtn);
+        }
+        showScreen('quiet');
+    }
+
+    async function setQuiet(timerIdx, minutes, hours) {
+        if (minutes === null) {
+            timers[timerIdx].quietUntil = null;
+            showStatus(`timer-status`, '🔔 Режим "Не беспокоить" отключён');
+        } else {
+            const quietUntil = new Date(Date.now() + minutes * 60 * 1000);
+            timers[timerIdx].quietUntil = quietUntil;
+            showStatus(`timer-status`, `🔕 Режим "Не беспокоить" включён на ${hours || Math.floor(minutes/60)} часов`);
+        }
+        saveTimersToLocal();
+        await syncToServer();
+        setTimeout(() => showScreen('main'), 1500);
+    }
+
+    async function toggleNotifications(timerIdx) {
+        timers[timerIdx].notifications = !timers[timerIdx].notifications;
+        saveTimersToLocal();
+        await syncToServer();
+        const quietBtn = document.querySelector(`.quiet-btn[data-idx="${timerIdx}"]`);
+        if (quietBtn) quietBtn.textContent = timers[timerIdx].notifications ? '🔔' : '🔕';
+        showStatus(`timer-status`, timers[timerIdx].notifications ? 'Уведомления включены' : 'Уведомления выключены');
+        setTimeout(() => showScreen('main'), 1000);
+    }
+
+    function loadStats(timerIdx) {
+        const timer = timers[timerIdx];
+        const statsDiv = document.getElementById('stats-content');
+        
+        if (!timer.events.length) {
+            statsDiv.innerHTML = 'Нет записей';
+            return;
+        }
+        
+        let text = `📊 ${timer.name}\n─────────────────────\n`;
+        for (let i = 0; i < Math.min(timer.events.length, 10); i++) {
+            const e = timer.events[i];
+            if (!e.timestamp || isNaN(e.timestamp.getTime())) continue;
+            let line = `${formatTime(e.timestamp)}`;
+            const prevEvent = i < timer.events.length - 1 ? timer.events[i + 1] : null;
+            if (prevEvent && prevEvent.timestamp && !isNaN(prevEvent.timestamp.getTime())) {
+                const diffSec = (e.timestamp - prevEvent.timestamp) / 1000;
+                const diff = formatDiffSmart(diffSec, timer.name);
+                if (diff) line += ` ${diff}`;
+            }
+            if (e.note) line += ` 📝 ${e.note}`;
+            text += line + '\n';
+        }
+        text += '\n[📜 Вся история]';
+        
+        statsDiv.innerHTML = text;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-history-btn';
+        deleteBtn.textContent = '🗑️ Удалить всю историю';
+        deleteBtn.onclick = () => showDeleteHistoryConfirm(timerIdx);
+        
+        const oldBtn = statsDiv.nextElementSibling;
+        if (oldBtn && oldBtn.classList && oldBtn.classList.contains('delete-history-btn')) {
+            oldBtn.remove();
+        }
+        statsDiv.after(deleteBtn);
+        
+        const link = statsDiv.querySelector('.history-link');
+        if (link) {
+            link.onclick = (e) => {
+                e.preventDefault();
+                let full = `📜 ВСЯ ИСТОРИЯ: ${timer.name}\n═══════════════════════\n`;
+                for (let i = 0; i < timer.events.length; i++) {
+                    const e = timer.events[i];
+                    if (!e.timestamp || isNaN(e.timestamp.getTime())) continue;
+                    let line = `${formatDate(e.timestamp)} ${formatTime(e.timestamp)}`;
+                    const prevEvent = i < timer.events.length - 1 ? timer.events[i + 1] : null;
+                    if (prevEvent && prevEvent.timestamp && !isNaN(prevEvent.timestamp.getTime())) {
+                        const diffSec = (e.timestamp - prevEvent.timestamp) / 1000;
+                        const diff = formatDiffSmart(diffSec, timer.name);
+                        if (diff) line += ` ${diff}`;
+                    }
+                    if (e.note) line += ` 📝 ${e.note}`;
+                    full += line + '\n';
+                }
+                statsDiv.innerHTML = full;
+                const backBtn = document.createElement('button');
+                backBtn.className = 'delete-history-btn';
+                backBtn.textContent = '◀️ Назад';
+                backBtn.onclick = () => loadStats(timerIdx);
+                statsDiv.after(backBtn);
+            };
+        }
+    }
+
+    function showDeleteHistoryConfirm(timerIdx) {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-menu">
+                <p>Удалить ВСЮ историю для режима "${timers[timerIdx].name}"?</p>
+                <p style="font-size: 12px; color: #888;">Данные будут удалены безвозвратно</p>
+                <div class="confirm-buttons">
+                    <button class="confirm-yes">Да</button>
+                    <button class="confirm-no">Нет</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.confirm-yes').addEventListener('click', () => {
+            overlay.remove();
+            deleteAllEvents(timerIdx);
+        });
+        overlay.querySelector('.confirm-no').addEventListener('click', () => overlay.remove());
+    }
+
+    function deleteAllEvents(timerIdx) {
+        timers[timerIdx].events = [];
+        timers[timerIdx].lastTimestamp = null;
+        saveTimersToLocal();
+        renderEventsList(timerIdx);
+        updateTimerDisplay();
+        syncToServer();
+        showStatus(`timer-status`, 'Вся история удалена');
+        setTimeout(() => showScreen('main'), 1000);
+    }
+
+    function loadSettingsForTimer(timerIdx) {
+        const timer = timers[timerIdx];
+        document.getElementById('mode-value').textContent = `${timer.icon} ${timer.name}`;
+        let intervalText = 'Свободный';
+        if (timer.interval > 0) {
+            intervalText = formatMinutesToTime(timer.interval);
+        }
+        document.getElementById('interval-value').textContent = intervalText;
+        
+        document.querySelector('[data-setting="mode"]').onclick = () => showModeScreen(timerIdx);
+        document.querySelector('[data-setting="interval"]').onclick = () => showIntervalScreen(timerIdx);
+        document.querySelector('[data-setting="alice"]').onclick = () => showScreen('alice');
+        document.querySelector('[data-setting="premium"]').onclick = () => showScreen('premium');
+        document.querySelector('[data-setting="reset"]').onclick = () => showResetConfirm(timerIdx);
+        document.querySelector('[data-setting="feedback"]').onclick = () => window.open('mailto:feedback@zasekatel.ru?subject=Обратная связь Засекатель', '_blank');
+    }
+
+    function showModeScreen(timerIdx) {
+        const modeList = document.createElement('div');
+        modeList.id = 'mode-list';
+        modeList.className = 'options-grid';
+        modeList.style.flexDirection = 'column';
+        modeList.innerHTML = '';
+        
+        popularModes.forEach(mode => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerHTML = `${mode.icon} ${mode.name}`;
+            btn.onclick = () => {
+                timers[timerIdx].name = mode.name;
+                timers[timerIdx].icon = mode.icon;
+                saveTimersToLocal();
+                syncToServer();
+                renderMainScreen();
+                showStatus('timer-status', `Режим изменён на ${mode.name}`);
+                setTimeout(() => showScreen('settings'), 1000);
+            };
+            modeList.appendChild(btn);
+        });
+        
+        const separator = document.createElement('div');
+        separator.style.height = '1px';
+        separator.style.backgroundColor = '#ddd';
+        separator.style.margin = '10px 0';
+        modeList.appendChild(separator);
+        
+        const customBtn = document.createElement('button');
+        customBtn.className = 'option-btn';
+        customBtn.innerHTML = `✏️ Свой вариант`;
+        customBtn.onclick = () => {
+            showCustomNameForTimer(timerIdx);
+        };
+        modeList.appendChild(customBtn);
+        
+        const oldModeScreen = document.getElementById('mode-screen');
+        if (oldModeScreen) oldModeScreen.remove();
+        
+        const modeScreen = document.createElement('div');
+        modeScreen.id = 'mode-screen';
+        modeScreen.className = 'screen';
+        modeScreen.innerHTML = `
+            <div class="screen-header"><button class="back-btn" data-back="settings">←</button><div class="screen-title">⚙️ Режим</div></div>
+            <div id="mode-list-container"></div>
+            <div id="mode-status" class="status hidden"></div>
+        `;
+        document.getElementById('app').appendChild(modeScreen);
+        modeScreen.querySelector('#mode-list-container').appendChild(modeList);
+        
+        screens.mode = modeScreen;
+        showScreen('mode');
+    }
+
+    function showCustomNameForTimer(timerIdx) {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-interval-overlay';
+        overlay.innerHTML = `
+            <div class="custom-interval-menu">
+                <div style="font-size: 18px; margin-bottom: 10px;">Название режима</div>
+                <input type="text" id="custom-name-input" placeholder="Введите название" value="${timers[timerIdx].name}" style="width:100%; padding:12px; border-radius:20px; border:1px solid #ddd;">
+                <div class="custom-interval-buttons" style="margin-top:15px;">
+                    <button class="custom-ok">Сохранить</button>
+                    <button class="custom-cancel">Отмена</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('#custom-name-input');
+        input.focus();
+        input.select();
+        overlay.querySelector('.custom-ok').addEventListener('click', () => {
+            const name = input.value.trim();
+            overlay.remove();
+            if (name && name !== timers[timerIdx].name) {
+                timers[timerIdx].name = name;
+                saveTimersToLocal();
+                renderMainScreen();
+                syncToServer();
+                showStatus('mode-status', `Режим переименован в "${name}"`);
+                setTimeout(() => showScreen('settings'), 1000);
+            } else {
+                showScreen('settings');
+            }
+        });
+        overlay.querySelector('.custom-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function showResetConfirm(timerIdx) {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-menu">
+                <p>Удалить все данные для режима "${timers[timerIdx].name}"?</p>
+                <div class="confirm-buttons">
+                    <button class="confirm-yes">Да</button>
+                    <button class="confirm-no">Нет</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.confirm-yes').addEventListener('click', () => {
+            overlay.remove();
+            resetTimer(timerIdx);
+        });
+        overlay.querySelector('.confirm-no').addEventListener('click', () => overlay.remove());
+    }
+
+    function resetTimer(timerIdx) {
+        timers[timerIdx].events = [];
+        timers[timerIdx].lastTimestamp = null;
+        saveTimersToLocal();
+        renderEventsList(timerIdx);
+        updateTimerDisplay();
+        syncToServer();
+        showStatus(`timer-status`, 'Таймер сброшен');
+        setTimeout(() => showScreen('main'), 1000);
+    }
+
+    function showIntervalScreen(timerIdx) {
+        const intervalOptions = document.getElementById('interval-options');
+        intervalOptions.innerHTML = '';
+        const intervals = [{ minutes: 0, text: 'Свободный' }, { minutes: 60, text: '1ч' }, { minutes: 120, text: '2ч' }, { minutes: 180, text: '3ч' }, { minutes: 240, text: '4ч' }];
+        intervals.forEach(interval => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.textContent = interval.text;
+            if (timers[timerIdx].interval === interval.minutes) btn.classList.add('selected-interval');
+            btn.onclick = () => {
+                timers[timerIdx].interval = interval.minutes;
+                saveTimersToLocal();
+                syncToServer();
+                showStatus(`timer-status`, interval.minutes === 0 ? 'Режим: свободный' : `Интервал: ${interval.text}`);
+                setTimeout(() => showScreen('main'), 1000);
+            };
+            intervalOptions.appendChild(btn);
+        });
+        const customBtn = document.createElement('button');
+        customBtn.className = 'option-btn';
+        customBtn.textContent = '✏️ Свой';
+        customBtn.addEventListener('click', () => showCustomIntervalPrompt(timerIdx));
+        intervalOptions.appendChild(customBtn);
+        showScreen('interval');
+    }
+
+    function showCustomIntervalPrompt(timerIdx) {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-interval-overlay';
+        overlay.innerHTML = `
+            <div class="custom-interval-menu">
+                <div style="font-size: 18px; margin-bottom: 10px;">Введите интервал</div>
+                <input type="text" id="custom-interval-input" placeholder="2ч, 30м, 2ч30м, 150" value="">
+                <div class="custom-hint">Примеры: 2ч, 30м, 2ч30м, 150 (минуты)</div>
+                <div class="custom-interval-buttons">
+                    <button class="custom-ok">OK</button>
+                    <button class="custom-cancel">Отмена</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('#custom-interval-input');
+        input.focus();
+        overlay.querySelector('.custom-ok').addEventListener('click', async () => {
+            let val = input.value.trim();
+            let minutes = 0;
+            if (val.match(/^\d+ч$/)) minutes = parseInt(val) * 60;
+            else if (val.match(/^\d+м$/)) minutes = parseInt(val);
+            else if (val.match(/^\d+ч\s*\d+м$/)) { let parts = val.match(/(\d+)ч\s*(\d+)м/); minutes = parseInt(parts[1]) * 60 + parseInt(parts[2]); }
+            else if (val.match(/^\d+$/)) minutes = parseInt(val);
+            else { showStatus('interval-status', 'Формат: 2ч, 30м, 2ч30м или минуты', true); return; }
+            if (minutes > 0) {
+                timers[timerIdx].interval = minutes;
+                saveTimersToLocal();
+                syncToServer();
+                showStatus('interval-status', `Интервал установлен: ${formatMinutesToTime(minutes)}`);
+                overlay.remove();
+                setTimeout(() => showScreen('main'), 1000);
+            } else showStatus('interval-status', 'Введите положительное число', true);
+        });
+        overlay.querySelector('.custom-cancel').addEventListener('click', () => overlay.remove());
+    }
+
+    function updateManualHint(timer) {
+        const hintEl = document.getElementById('manual-hint');
+        if (timer.interval > 720) hintEl.innerHTML = '⏰ Интервал более 12 часов. Введите дату и время: <strong>23.03 23:30</strong>';
+        else hintEl.innerHTML = '💡 Если введёте время позже текущего, я пойму что это вчера';
+    }
+
+    function showStatus(elementId, message, isError = false) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        el.textContent = message;
+        el.className = 'status ' + (isError ? 'error' : 'success');
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 3000);
+    }
+
+    async function callAPI(endpoint, method = 'GET', data = null) {
+        try {
+            const url = new URL(`${API_BASE}${endpoint}`);
+            if (method === 'GET') url.searchParams.append('user_id', currentUserId);
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (data && method !== 'GET') options.body = JSON.stringify({ ...data, user_id: currentUserId });
+            const response = await fetch(url.toString(), options);
+            return await response.json();
+        } catch (error) { return { error: true, message: error.message }; }
+    }
+
+    async function generateAliceCode() {
+        const result = await callAPI('/link/generate', 'POST', {});
+        if (!result.error && result.code) {
+            document.getElementById('alice-code').textContent = result.code;
+            showStatus('alice-status', 'Новый код: ' + result.code);
+        } else {
+            document.getElementById('alice-code').textContent = '----';
+            showStatus('alice-status', 'Ошибка генерации кода', true);
+        }
+    }
+
+    const screens = {
+        main: document.getElementById('main-screen'),
+        quiet: document.getElementById('quiet-screen'),
+        manual: document.getElementById('manual-screen'),
+        note: document.getElementById('note-screen'),
+        stats: document.getElementById('stats-screen'),
+        settings: document.getElementById('settings-screen'),
+        interval: document.getElementById('interval-screen'),
+        alice: document.getElementById('alice-screen'),
+        premium: document.getElementById('premium-screen'),
+        help: document.getElementById('help-screen')
+    };
+
+    function showScreen(screenId) {
+        Object.values(screens).forEach(s => s.classList.remove('active'));
+        screens[screenId].classList.add('active');
+    }
+
+    document.querySelectorAll('[data-back]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = btn.getAttribute('data-back');
+            if (target === 'main') showScreen('main');
+            else if (target === 'settings') showScreen('settings');
+        });
+    });
+    document.querySelectorAll('.help-btn').forEach(btn => btn.addEventListener('click', () => showScreen('help')));
+    document.getElementById('help-more').addEventListener('click', () => window.open('https://mirsanov.duckdns.org/info/', '_blank'));
+    document.getElementById('premium-trial').addEventListener('click', () => { showStatus('premium-status', 'Пробный период активирован!'); setTimeout(() => showScreen('settings'), 1500); });
+    document.getElementById('alice-refresh').addEventListener('click', async () => await generateAliceCode());
+
+    document.querySelectorAll('.master-btn[data-mode]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const name = btn.getAttribute('data-mode');
+            const icon = btn.getAttribute('data-icon');
+            createTimer(name, icon);
+        });
+    });
+    document.getElementById('master-custom').addEventListener('click', () => {
+        showCustomNameDialog();
+    });
+
+    document.getElementById('manual-submit').addEventListener('click', async () => {
+        const timeStr = document.getElementById('manual-time').value.trim();
+        if (!timeStr) { showStatus('manual-status', 'Введите время', true); return; }
+        const success = await addManualEvent(activeTimerIndex, timeStr);
+        if (success) {
+            document.getElementById('manual-time').value = '';
+            showScreen('main');
+        }
+    });
+
+    document.getElementById('note-submit').addEventListener('click', async () => {
+        const note = document.getElementById('note-text').value.trim();
+        if (!note) { showStatus('note-status', 'Введите заметку', true); return; }
+        if (timers[activeTimerIndex].events.length === 0) { showStatus('note-status', 'Сначала запишите событие', true); return; }
+        timers[activeTimerIndex].events[0].note = note;
+        saveTimersToLocal();
+        renderEventsList(activeTimerIndex);
+        await syncToServer();
+        showStatus('note-status', 'Заметка добавлена');
+        document.getElementById('note-text').value = '';
+        setTimeout(() => showScreen('main'), 500);
+    });
+
+    currentUserId = getUserId();
+    loadTimersFromLocal();
+    generateAliceCode();
+    setInterval(() => { if (document.getElementById('main-screen').classList.contains('active')) updateTimerDisplay(); }, 1000);
+</script>
+</body>
+</html>
