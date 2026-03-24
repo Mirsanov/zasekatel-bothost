@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <title>Засекатель - Тест</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .card {
+            background: white;
+            border-radius: 40px;
+            padding: 32px 24px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .status {
+            background: #f0f0f0;
+            border-radius: 30px;
+            padding: 16px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .status-ok {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        .status-error {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        .links {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border-radius: 40px;
+            font-size: 14px;
+        }
+        .btn {
+            display: inline-block;
+            background: #48bb78;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 40px;
+            text-decoration: none;
+            margin-top: 16px;
+            font-weight: 500;
+        }
+        .info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 20px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>⏱️ Засекатель</h1>
+        <p>Тестовый режим</p>
+        <div id="status" class="status">Проверка соединения...</div>
+        <div class="links">
+            <a href="/health">/health</a>
+            <a href="/api/test">/api/test</a>
+            <a href="/miniapp/">/miniapp/</a>
+        </div>
+        <a href="/health" class="btn">Проверить API</a>
+        <div class="info" id="api-url"></div>
+    </div>
+    <script>
+        const apiUrl = window.location.origin + '/api';
+        document.getElementById('api-url').innerHTML = 'API: ' + apiUrl;
+        
+        fetch('/health')
+            .then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(data => {
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerHTML = '✅ API работает! Порт: ' + data.port;
+                statusDiv.classList.add('status-ok');
+            })
+            .catch(err => {
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerHTML = '❌ Ошибка: ' + err.message;
+                statusDiv.classList.add('status-error');
+            });
+    </script>
+</body>
+</html>
